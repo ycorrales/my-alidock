@@ -58,6 +58,9 @@ while [[ $# -gt 0 ]]; do
       function pinfo() { :; }
       function pwarn() { :; }
     ;;
+    --no-shell)
+      NO_SHELL=1
+    ;;
     --help)
       pinfo "alidock-installer.sh: install alidock in a Python virtualenv"
       pinfo ""
@@ -73,6 +76,7 @@ while [[ $# -gt 0 ]]; do
       pwarn "Parameters:"
       pwarn "    --no-check-docker            # don't check if Docker works"
       pwarn "    --quiet                      # suppress messages (except errors)"
+      pwarn "    --no-shell                   # don't copy patch init script in \$SHELLRC"
       exit 1
     ;;
     -*)
@@ -142,18 +146,20 @@ rm -rf "${VENV_DEST}.bak"  # not needed anymore
 
 # Patch init scripts for bash and zsh
 SHELL_CHANGED=
-for SHELLRC in $HOME/.bashrc $HOME/.bash_profile $HOME/.zshrc; do
-  if ! grep -q 'function alidock()' "$SHELLRC" &> /dev/null; then
-    pinfo "Adding alidock to $SHELLRC"
-    touch "$SHELLRC"
-    if [[ $(tail -c 1 "$SHELLRC") ]]; then
-      echo >> "$SHELLRC"
+if [[ -z $NO_SHELL ]]; then
+  for SHELLRC in $HOME/.bashrc $HOME/.bash_profile $HOME/.zshrc; do
+    if ! grep -q 'function alidock()' "$SHELLRC" &> /dev/null; then
+      pinfo "Adding alidock to $SHELLRC"
+      touch "$SHELLRC"
+      if [[ $(tail -c 1 "$SHELLRC") ]]; then
+        echo >> "$SHELLRC"
+      fi
+      echo '# Execute alidock within the appropriate Python virtual environment' >> "$SHELLRC"
+      echo 'function alidock() {( source "'$VENV_DEST'/bin/activate" && command alidock "$@"; exit $?; )}' >> "$SHELLRC"
+      SHELL_CHANGED=1
     fi
-    echo '# Execute alidock within the appropriate Python virtual environment' >> "$SHELLRC"
-    echo 'function alidock() {( source "'$VENV_DEST'/bin/activate" && command alidock "$@"; exit $?; )}' >> "$SHELLRC"
-    SHELL_CHANGED=1
-  fi
-done
+  done
+fi
 
 pinfo "Installed: $(alidock --version)"
 
